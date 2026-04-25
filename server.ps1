@@ -25,9 +25,21 @@ try {
         
         $localPath = $request.Url.LocalPath.TrimStart('/').Replace('/', '\')
         if ($localPath -eq '') { $localPath = 'index.html' }
-        $filePath = Join-Path -Path $path -ChildPath $localPath
         
-        if (Test-Path $filePath -PathType Leaf) {
+        $filePath = Join-Path -Path $path -ChildPath $localPath
+        $filePath = [System.IO.Path]::GetFullPath($filePath)
+        $fullBasePath = [System.IO.Path]::GetFullPath($path)
+        if (-not $fullBasePath.EndsWith('\')) { $fullBasePath += '\' }
+        
+        if (-not $filePath.StartsWith($fullBasePath)) {
+            $response.StatusCode = 403
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes("403 - Acesso Negado (Directory Traversal)")
+            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        } elseif ($filePath -match '\.ps1$' -or $filePath -match '\\\.git') {
+            $response.StatusCode = 403
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes("403 - Acesso Negado (Arquivo Restrito)")
+            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        } elseif (Test-Path $filePath -PathType Leaf) {
             $extension = [System.IO.Path]::GetExtension($filePath)
             $contentType = switch ($extension.ToLower()) {
                 ".html" { "text/html; charset=utf-8" }
